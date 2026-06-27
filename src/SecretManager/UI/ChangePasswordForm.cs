@@ -22,11 +22,9 @@ public sealed class ChangePasswordForm : Form
         ClientSize = new Size(420, 280);
         Theme.ApplyForm(this);
 
-        Controls.Add(Theme.Header("Trocar senha mestra", "O cofre será re-criptografado"));
+        var header = Theme.Header("Trocar senha mestra", "O cofre será re-criptografado");
 
         var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
-        Controls.Add(body);
-        body.BringToFront();
 
         body.Controls.Add(Lbl("Nova senha", 0));
         _new.Width = 372; _new.Location = new Point(0, 22);
@@ -44,8 +42,10 @@ public sealed class ChangePasswordForm : Form
         var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(24, 12, 24, 0), BackColor = Theme.Surface };
         buttons.Controls.Add(ok);
         buttons.Controls.Add(cancel);
+
+        Controls.Add(body);
+        Controls.Add(header);
         Controls.Add(buttons);
-        buttons.BringToFront();
 
         AcceptButton = ok;
         CancelButton = cancel;

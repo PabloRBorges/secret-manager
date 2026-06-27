@@ -37,8 +37,8 @@ public sealed class MainForm : Form
 
         Text = "Secret Manager";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(760, 520);
-        MinimumSize = new Size(620, 420);
+        ClientSize = new Size(940, 560);
+        MinimumSize = new Size(760, 440);
         ShowInTaskbar = true;
         Theme.ApplyForm(this);
 
@@ -70,17 +70,17 @@ public sealed class MainForm : Form
         // --- Barra de acoes ---
         var toolbar = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Theme.AppBackground, Padding = new Padding(16, 11, 16, 0) };
 
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent };
-        actions.Controls.Add(MakeButton("+ Nova", ButtonKind.Primary, () => AddEntry(), 96));
-        actions.Controls.Add(MakeButton("Editar", ButtonKind.Secondary, () => EditSelected(), 84));
-        actions.Controls.Add(MakeButton("Excluir", ButtonKind.Secondary, () => DeleteSelected(), 84));
-        actions.Controls.Add(MakeButton("Copiar senha", ButtonKind.Secondary, () => CopySelected(true), 120));
-        actions.Controls.Add(MakeButton("Copiar usuário", ButtonKind.Secondary, () => CopySelected(false), 126));
-
-        var rightActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, AutoSize = true };
+        var rightActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Theme.AppBackground, AutoSize = true };
         rightActions.Controls.Add(MakeButton("Backup", ButtonKind.Ghost, () => DoBackup(), 84));
         rightActions.Controls.Add(MakeButton("Config", ButtonKind.Ghost, () => OpenSettings(), 78));
-        rightActions.Controls.Add(MakeButton("🔒 Travar", ButtonKind.Ghost, () => LockRequested?.Invoke(this, EventArgs.Empty), 92));
+        rightActions.Controls.Add(MakeButton("🔒 Travar", ButtonKind.Ghost, () => LockRequested?.Invoke(this, EventArgs.Empty), 96));
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Theme.AppBackground };
+        actions.Controls.Add(MakeButton("+ Nova", ButtonKind.Primary, () => AddEntry(), 92));
+        actions.Controls.Add(MakeButton("Editar", ButtonKind.Secondary, () => EditSelected(), 80));
+        actions.Controls.Add(MakeButton("Excluir", ButtonKind.Secondary, () => DeleteSelected(), 80));
+        actions.Controls.Add(MakeButton("Copiar senha", ButtonKind.Secondary, () => CopySelected(true), 120));
+        actions.Controls.Add(MakeButton("Copiar usuário", ButtonKind.Secondary, () => CopySelected(false), 138));
 
         toolbar.Controls.Add(actions);
         toolbar.Controls.Add(rightActions);

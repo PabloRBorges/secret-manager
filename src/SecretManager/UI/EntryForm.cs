@@ -26,12 +26,12 @@ public sealed class EntryForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(460, 470);
+        ClientSize = new Size(460, 540);
         Theme.ApplyForm(this);
 
-        Controls.Add(Theme.Header(
+        var header = Theme.Header(
             existing is null ? "Nova credencial" : "Editar credencial",
-            "Os dados são salvos criptografados no cofre"));
+            "Os dados são salvos criptografados no cofre");
 
         _title.Text = Entry.Title;
         _username.Text = Entry.Username;
@@ -47,8 +47,6 @@ public sealed class EntryForm : Form
         _gen.Click += (_, _) => { _password.UseSystemPasswordChar = false; _show.Text = "Ocultar"; _password.Text = PasswordGenerator.Generate(); };
 
         var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
-        Controls.Add(body);
-        body.BringToFront();
 
         int y = 0;
         y = AddField(body, "Título", _title, y);
@@ -82,8 +80,10 @@ public sealed class EntryForm : Form
         };
         buttons.Controls.Add(ok);
         buttons.Controls.Add(cancel);
+
+        Controls.Add(body);
+        Controls.Add(header);
         Controls.Add(buttons);
-        buttons.BringToFront();
 
         AcceptButton = ok;
         CancelButton = cancel;

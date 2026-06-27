@@ -31,11 +31,8 @@ public sealed class UnlockForm : Form
         var header = Theme.Header(
             _isCreate ? "Criar cofre" : "Bem-vindo de volta",
             _isCreate ? "Defina sua senha mestra" : "Informe sua senha mestra para continuar");
-        Controls.Add(header);
 
         var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 20, 24, 20), BackColor = Theme.Surface };
-        Controls.Add(body);
-        body.BringToFront();
 
         var lblPw = MakeLabel("Senha mestra");
         lblPw.Location = new Point(2, 0);
@@ -89,8 +86,11 @@ public sealed class UnlockForm : Form
         };
         buttons.Controls.Add(ok);
         buttons.Controls.Add(cancel);
+
+        // Fill primeiro (igual a MainForm), depois as bordas Top/Bottom.
+        Controls.Add(body);
+        Controls.Add(header);
         Controls.Add(buttons);
-        buttons.BringToFront();
 
         AcceptButton = ok;
         CancelButton = cancel;

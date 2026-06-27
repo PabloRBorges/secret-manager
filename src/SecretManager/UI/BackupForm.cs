@@ -27,13 +27,11 @@ public sealed class BackupForm : Form
         ClientSize = new Size(480, 320);
         Theme.ApplyForm(this);
 
-        Controls.Add(Theme.Header("Backup para pendrive", "Cópia do cofre, também criptografada"));
+        var header = Theme.Header("Backup para pendrive", "Cópia do cofre, também criptografada");
 
         _auto.Checked = _settings.BackupOnSave;
 
         var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
-        Controls.Add(body);
-        body.BringToFront();
 
         var info = new Label
         {
@@ -70,8 +68,10 @@ public sealed class BackupForm : Form
         var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(24, 12, 24, 0), BackColor = Theme.Surface };
         buttons.Controls.Add(ok);
         buttons.Controls.Add(close);
+
+        Controls.Add(body);
+        Controls.Add(header);
         Controls.Add(buttons);
-        buttons.BringToFront();
 
         CancelButton = close;
         LoadDrives();

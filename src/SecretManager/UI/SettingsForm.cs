@@ -26,15 +26,13 @@ public sealed class SettingsForm : Form
         ClientSize = new Size(440, 320);
         Theme.ApplyForm(this);
 
-        Controls.Add(Theme.Header("Configurações", "Segurança e comportamento do app"));
+        var header = Theme.Header("Configurações", "Segurança e comportamento do app");
 
         _autoLock.Value = Math.Clamp(settings.AutoLockMinutes, 0, 120);
         _clipClear.Value = Math.Clamp(settings.ClipboardClearSeconds, 5, 600);
         _startup.Checked = settings.StartWithWindows;
 
         var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 20, 24, 0), BackColor = Theme.Surface };
-        Controls.Add(body);
-        body.BringToFront();
 
         body.Controls.Add(Row("Travar após inatividade (min, 0 = nunca)", _autoLock, 4));
         body.Controls.Add(Row("Limpar área de transferência após (s)", _clipClear, 52));
@@ -52,8 +50,10 @@ public sealed class SettingsForm : Form
         var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(24, 12, 24, 0), BackColor = Theme.Surface };
         buttons.Controls.Add(ok);
         buttons.Controls.Add(cancel);
+
+        Controls.Add(body);
+        Controls.Add(header);
         Controls.Add(buttons);
-        buttons.BringToFront();
 
         AcceptButton = ok;
         CancelButton = cancel;
