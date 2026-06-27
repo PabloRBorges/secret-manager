@@ -13,7 +13,7 @@ public sealed class UiTextBox : Panel
 
     public UiTextBox(bool password = false, bool multiline = false)
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Theme.FieldBackground;
         Padding = new Padding(11, 9, 11, 9);
 

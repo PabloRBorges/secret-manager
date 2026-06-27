@@ -24,7 +24,7 @@ public sealed class UnlockForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(420, _isCreate ? 350 : 230);
+        ClientSize = new Size(420, _isCreate ? 390 : 230);
         TopMost = true;
         Theme.ApplyForm(this);
 
@@ -32,45 +32,45 @@ public sealed class UnlockForm : Form
             _isCreate ? "Criar cofre" : "Bem-vindo de volta",
             _isCreate ? "Defina sua senha mestra" : "Informe sua senha mestra para continuar");
 
-        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 20, 24, 20), BackColor = Theme.Surface };
+        // Layout por TableLayoutPanel: o framework cuida de margens/largura em
+        // qualquer DPI (posicionamento absoluto nao respeita Padding de forma confiavel).
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 16), BackColor = Theme.Surface };
+        var table = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            BackColor = Theme.Surface,
+        };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        var lblPw = MakeLabel("Senha mestra");
-        lblPw.Location = new Point(2, 0);
-        body.Controls.Add(lblPw);
-        _password.Width = 372;
-        _password.Location = new Point(0, 22);
-        body.Controls.Add(_password);
+        void AddRow(Control c, int topGap)
+        {
+            c.Margin = new Padding(0, topGap, 0, 0);
+            c.Dock = DockStyle.Top;
+            table.Controls.Add(c);
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
 
-        int nextTop = 22 + _password.Height + 14;
+        AddRow(MakeLabel("Senha mestra"), 0);
+        AddRow(_password, 6);
+        _password.TextChanged += (_, _) => UpdateStrength();
 
         if (_isCreate)
         {
-            var lblConfirm = MakeLabel("Confirmar senha");
-            lblConfirm.Location = new Point(0, nextTop);
-            body.Controls.Add(lblConfirm);
-
-            _confirm.Width = 372;
-            _confirm.Location = new Point(0, nextTop + 22);
-            body.Controls.Add(_confirm);
-
-            _strength.Location = new Point(2, nextTop + 22 + _confirm.Height + 6);
-            body.Controls.Add(_strength);
-
-            var warn = new Label
+            AddRow(MakeLabel("Confirmar senha"), 14);
+            AddRow(_confirm, 6);
+            AddRow(_strength, 6);
+            AddRow(new Label
             {
                 Text = "⚠  Esta senha NÃO pode ser recuperada. Se esquecê-la, o cofre fica inacessível.",
                 AutoSize = false,
-                Width = 372,
-                Height = 36,
-                Location = new Point(0, nextTop + 22 + _confirm.Height + 26),
+                Height = 44,
                 ForeColor = Theme.Danger,
                 Font = Theme.Small,
-            };
-            body.Controls.Add(warn);
-
-            _password.TextChanged += (_, _) => UpdateStrength();
-            nextTop = warn.Bottom + 12;
+            }, 10);
         }
+
+        body.Controls.Add(table);
 
         var ok = new AccentButton(_isCreate ? "Criar cofre" : "Destravar", ButtonKind.Primary) { Width = 150 };
         var cancel = new AccentButton("Cancelar", ButtonKind.Secondary) { Width = 110, DialogResult = DialogResult.Cancel };
