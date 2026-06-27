@@ -32,7 +32,7 @@ public sealed class EntryForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(460, 600);
+        ClientSize = new Size(460, 650);
         Theme.ApplyForm(this);
 
         if (existingGroups is not null)
@@ -56,33 +56,60 @@ public sealed class EntryForm : Form
         };
         _gen.Click += (_, _) => { _password.UseSystemPasswordChar = false; _show.Text = "Ocultar"; _password.Text = PasswordGenerator.Generate(); };
 
-        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
+        // Layout por TableLayoutPanel: margens/larguras corretas em qualquer DPI.
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 16, 24, 12), BackColor = Theme.Surface };
+        var table = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            BackColor = Theme.Surface,
+        };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        int y = 0;
-        y = AddField(body, "Título", _title, y);
-        y = AddField(body, "Usuário", _username, y);
+        void AddRow(Control c, int topGap)
+        {
+            c.Margin = new Padding(0, topGap, 0, 0);
+            c.Dock = DockStyle.Top;
+            table.Controls.Add(c);
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        }
 
-        // Linha da senha: campo + Gerar + Mostrar
-        body.Controls.Add(MakeLabel("Senha", y));
-        _password.Width = 412 - 2 * 88;
-        _password.Location = new Point(0, y + 22);
-        body.Controls.Add(_password);
-        _gen.Location = new Point(_password.Right + 8, y + 22);
-        _show.Location = new Point(_gen.Right + 4, y + 22);
-        body.Controls.Add(_gen);
-        body.Controls.Add(_show);
-        y = y + 22 + _password.Height + 14;
+        AddRow(MakeLabel("Título"), 0);
+        AddRow(_title, 6);
+        AddRow(MakeLabel("Usuário"), 12);
+        AddRow(_username, 6);
 
-        y = AddField(body, "URL", _url, y);
+        AddRow(MakeLabel("Senha"), 12);
+        // Linha da senha: campo (estica) + Gerar + Mostrar
+        var pwRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 38,
+            ColumnCount = 3,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Theme.Surface,
+        };
+        pwRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        pwRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        pwRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _password.Dock = DockStyle.Fill;
+        _password.Margin = new Padding(0);
+        _gen.Margin = new Padding(8, 0, 0, 0);
+        _show.Margin = new Padding(4, 0, 0, 0);
+        pwRow.Controls.Add(_password, 0, 0);
+        pwRow.Controls.Add(_gen, 1, 0);
+        pwRow.Controls.Add(_show, 2, 0);
+        table.Controls.Add(pwRow);
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        // Grupo (opcional): combo editavel com os grupos ja existentes.
-        body.Controls.Add(MakeLabel("Grupo (opcional)", y));
-        _group.Width = 412;
-        _group.Location = new Point(0, y + 22);
-        body.Controls.Add(_group);
-        y = y + 22 + _group.Height + 14;
+        AddRow(MakeLabel("URL"), 12);
+        AddRow(_url, 6);
+        AddRow(MakeLabel("Grupo (opcional)"), 12);
+        AddRow(_group, 6);
+        AddRow(MakeLabel("Notas"), 12);
+        AddRow(_notes, 6);
 
-        y = AddField(body, "Notas", _notes, y);
+        body.Controls.Add(table);
 
         var ok = new AccentButton("Salvar", ButtonKind.Primary) { Width = 130 };
         var cancel = new AccentButton("Cancelar", ButtonKind.Secondary) { Width = 110, DialogResult = DialogResult.Cancel };
@@ -107,23 +134,13 @@ public sealed class EntryForm : Form
         CancelButton = cancel;
     }
 
-    private static Label MakeLabel(string text, int y) => new()
+    private static Label MakeLabel(string text) => new()
     {
         Text = text,
         AutoSize = true,
         Font = Theme.Bold,
         ForeColor = Theme.Text,
-        Location = new Point(2, y),
     };
-
-    private static int AddField(Panel body, string label, UiTextBox field, int y)
-    {
-        body.Controls.Add(MakeLabel(label, y));
-        field.Width = 412;
-        field.Location = new Point(0, y + 22);
-        body.Controls.Add(field);
-        return y + 22 + field.Height + 14;
-    }
 
     private void OnSave(object? sender, EventArgs e)
     {
