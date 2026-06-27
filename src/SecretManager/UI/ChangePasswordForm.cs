@@ -6,8 +6,8 @@ namespace SecretManager.UI;
 public sealed class ChangePasswordForm : Form
 {
     private readonly VaultStore _store;
-    private readonly TextBox _new = new() { Width = 280, UseSystemPasswordChar = true };
-    private readonly TextBox _confirm = new() { Width = 280, UseSystemPasswordChar = true };
+    private readonly UiTextBox _new = new(password: true);
+    private readonly UiTextBox _confirm = new(password: true);
 
     public ChangePasswordForm(VaultStore store)
     {
@@ -19,53 +19,63 @@ public sealed class ChangePasswordForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Padding = new Padding(16);
+        ClientSize = new Size(420, 280);
+        Theme.ApplyForm(this);
 
-        var layout = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
-        layout.Controls.Add(new Label { Text = "Nova senha:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        layout.Controls.Add(_new, 1, 0);
-        layout.Controls.Add(new Label { Text = "Confirmar:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-        layout.Controls.Add(_confirm, 1, 1);
+        Controls.Add(Theme.Header("Trocar senha mestra", "O cofre será re-criptografado"));
 
-        var ok = new Button { Text = "Trocar", DialogResult = DialogResult.OK, Width = 100 };
-        var cancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Width = 100 };
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
+        Controls.Add(body);
+        body.BringToFront();
+
+        body.Controls.Add(Lbl("Nova senha", 0));
+        _new.Width = 372; _new.Location = new Point(0, 22);
+        body.Controls.Add(_new);
+
+        int t = 22 + _new.Height + 14;
+        body.Controls.Add(Lbl("Confirmar senha", t));
+        _confirm.Width = 372; _confirm.Location = new Point(0, t + 22);
+        body.Controls.Add(_confirm);
+
+        var ok = new AccentButton("Trocar senha", ButtonKind.Primary) { Width = 140 };
+        var cancel = new AccentButton("Cancelar", ButtonKind.Secondary) { Width = 110, DialogResult = DialogResult.Cancel };
         ok.Click += OnOk;
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill };
-        buttons.Controls.Add(cancel);
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(24, 12, 24, 0), BackColor = Theme.Surface };
         buttons.Controls.Add(ok);
-        layout.SetColumnSpan(buttons, 2);
-        layout.Controls.Add(buttons, 0, 2);
+        buttons.Controls.Add(cancel);
+        Controls.Add(buttons);
+        buttons.BringToFront();
 
-        Controls.Add(layout);
         AcceptButton = ok;
         CancelButton = cancel;
     }
+
+    private static Label Lbl(string text, int y) => new()
+    {
+        Text = text, AutoSize = true, Font = Theme.Bold, ForeColor = Theme.Text, Location = new Point(2, y),
+    };
 
     private void OnOk(object? sender, EventArgs e)
     {
         if (_new.Text.Length < 8)
         {
-            DialogResult = DialogResult.None;
             MessageBox.Show(this, "Use ao menos 8 caracteres.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         if (_new.Text != _confirm.Text)
         {
-            DialogResult = DialogResult.None;
-            MessageBox.Show(this, "As senhas nao conferem.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "As senhas não conferem.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         try
         {
             _store.ChangeMasterPassword(_new.Text);
             MessageBox.Show(this, "Senha mestra alterada.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            DialogResult = DialogResult.OK;
         }
         catch (Exception ex)
         {
-            DialogResult = DialogResult.None;
             MessageBox.Show(this, "Falha: " + ex.Message, "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

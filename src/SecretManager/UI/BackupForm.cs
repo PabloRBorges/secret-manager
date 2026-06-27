@@ -8,10 +8,8 @@ public sealed class BackupForm : Form
     private readonly VaultStore _store;
     private readonly AppSettings _settings;
 
-    private readonly ComboBox _drives = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly Button _refresh = new() { Text = "Atualizar", Width = 90 };
-    private readonly Button _browse = new() { Text = "Outra pasta...", Width = 110 };
-    private readonly CheckBox _auto = new() { Text = "Fazer backup automatico a cada alteracao", AutoSize = true };
+    private readonly ComboBox _drives = new() { Width = 290, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10f) };
+    private readonly CheckBox _auto = new() { Text = "  Fazer backup automático a cada alteração", AutoSize = true, Font = Theme.Base, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
 
     private string? _customPath;
 
@@ -26,43 +24,54 @@ public sealed class BackupForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Padding = new Padding(16);
+        ClientSize = new Size(480, 320);
+        Theme.ApplyForm(this);
+
+        Controls.Add(Theme.Header("Backup para pendrive", "Cópia do cofre, também criptografada"));
 
         _auto.Checked = _settings.BackupOnSave;
-        _refresh.Click += (_, _) => LoadDrives();
-        _browse.Click += OnBrowse;
+
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
+        Controls.Add(body);
+        body.BringToFront();
 
         var info = new Label
         {
-            Text = "O backup e gravado JA CRIPTOGRAFADO (AES-256-GCM), com a mesma senha mestra.\n"
-                 + "Mesmo que o pendrive seja perdido, o conteudo permanece protegido.",
-            AutoSize = true,
-            MaximumSize = new Size(420, 0),
-            ForeColor = Color.DimGray,
+            Text = "O backup é gravado JÁ CRIPTOGRAFADO (AES-256-GCM), com a mesma senha mestra.\n"
+                 + "Mesmo que o pendrive seja perdido, o conteúdo permanece protegido.",
+            AutoSize = false,
+            Width = 420,
+            Height = 44,
+            Location = new Point(2, 0),
+            ForeColor = Theme.TextMuted,
+            Font = Theme.Small,
         };
+        body.Controls.Add(info);
 
-        var drivePanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
-        drivePanel.Controls.Add(_drives);
-        drivePanel.Controls.Add(_refresh);
-        drivePanel.Controls.Add(_browse);
+        body.Controls.Add(new Label { Text = "Destino", AutoSize = true, Font = Theme.Bold, ForeColor = Theme.Text, Location = new Point(2, 56) });
 
-        var ok = new Button { Text = "Fazer backup", Width = 120 };
-        var close = new Button { Text = "Fechar", DialogResult = DialogResult.Cancel, Width = 90 };
+        _drives.Location = new Point(2, 80);
+        body.Controls.Add(_drives);
+
+        var refresh = new AccentButton("Atualizar", ButtonKind.Ghost) { Width = 90, Height = 32, Location = new Point(300, 80) };
+        var browse = new AccentButton("Outra pasta", ButtonKind.Ghost) { Width = 100, Height = 32, Location = new Point(394 - 6, 80) };
+        refresh.Click += (_, _) => LoadDrives();
+        browse.Click += OnBrowse;
+        body.Controls.Add(refresh);
+        body.Controls.Add(browse);
+
+        _auto.Location = new Point(2, 128);
+        body.Controls.Add(_auto);
+
+        var ok = new AccentButton("Fazer backup", ButtonKind.Primary) { Width = 140 };
+        var close = new AccentButton("Fechar", ButtonKind.Secondary) { Width = 100, DialogResult = DialogResult.Cancel };
         ok.Click += OnBackup;
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill };
-        buttons.Controls.Add(close);
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, Height = 62, Padding = new Padding(24, 12, 24, 0), BackColor = Theme.Surface };
         buttons.Controls.Add(ok);
-
-        var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, Dock = DockStyle.Fill };
-        layout.Controls.Add(info);
-        layout.Controls.Add(new Label { Text = "Destino:", AutoSize = true, Margin = new Padding(0, 10, 0, 0) });
-        layout.Controls.Add(drivePanel);
-        layout.Controls.Add(_auto);
-        layout.Controls.Add(buttons);
-        Controls.Add(layout);
+        buttons.Controls.Add(close);
+        Controls.Add(buttons);
+        buttons.BringToFront();
 
         CancelButton = close;
         LoadDrives();
@@ -79,7 +88,10 @@ public sealed class BackupForm : Form
         if (_drives.Items.Count > 0)
             _drives.SelectedIndex = 0;
         else
-            _drives.Items.Add("Nenhum pendrive detectado — use 'Outra pasta...'");
+        {
+            _drives.Items.Add("Nenhum pendrive detectado — use “Outra pasta”");
+            _drives.SelectedIndex = 0;
+        }
     }
 
     private void OnBrowse(object? sender, EventArgs e)
@@ -105,8 +117,7 @@ public sealed class BackupForm : Form
         var dest = ResolveDestination();
         if (string.IsNullOrEmpty(dest))
         {
-            MessageBox.Show(this, "Selecione um destino valido.", "Backup",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Selecione um destino válido.", "Backup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -116,13 +127,11 @@ public sealed class BackupForm : Form
             _settings.BackupOnSave = _auto.Checked;
             _settings.BackupDrivePath = dest;
             _settings.Save();
-            MessageBox.Show(this, "Backup criado:\n" + path, "Backup",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Backup criado:\n" + path, "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Falha no backup: " + ex.Message, "Backup",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, "Falha no backup: " + ex.Message, "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

@@ -9,79 +9,112 @@ public sealed class UnlockForm : Form
     private readonly VaultStore _store;
     private readonly bool _isCreate;
 
-    private readonly TextBox _password = new() { UseSystemPasswordChar = true, Width = 300 };
-    private readonly TextBox _confirm = new() { UseSystemPasswordChar = true, Width = 300 };
-    private readonly Label _strength = new() { AutoSize = true, ForeColor = Color.Gray };
-    private readonly Button _ok = new() { Text = "OK", DialogResult = DialogResult.OK, Width = 100 };
-    private readonly Button _cancel = new() { Text = "Cancelar", DialogResult = DialogResult.Cancel, Width = 100 };
+    private readonly UiTextBox _password = new(password: true);
+    private readonly UiTextBox _confirm = new(password: true);
+    private readonly Label _strength = new() { AutoSize = true, ForeColor = Theme.TextMuted, Font = Theme.Small };
 
     public UnlockForm(VaultStore store)
     {
         _store = store;
         _isCreate = !store.VaultExists;
 
-        Text = _isCreate ? "Criar cofre — defina a senha mestra" : "Destravar cofre";
+        Text = _isCreate ? "Criar cofre" : "Destravar cofre";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Padding = new Padding(16);
-        AcceptButton = _ok;
-        CancelButton = _cancel;
+        ClientSize = new Size(420, _isCreate ? 350 : 230);
         TopMost = true;
+        Theme.ApplyForm(this);
 
-        var layout = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
-        layout.Controls.Add(new Label { Text = "Senha mestra:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        layout.Controls.Add(_password, 1, 0);
+        var header = Theme.Header(
+            _isCreate ? "Criar cofre" : "Bem-vindo de volta",
+            _isCreate ? "Defina sua senha mestra" : "Informe sua senha mestra para continuar");
+        Controls.Add(header);
 
-        int row = 1;
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 20, 24, 20), BackColor = Theme.Surface };
+        Controls.Add(body);
+        body.BringToFront();
+
+        var lblPw = MakeLabel("Senha mestra");
+        lblPw.Location = new Point(2, 0);
+        body.Controls.Add(lblPw);
+        _password.Width = 372;
+        _password.Location = new Point(0, 22);
+        body.Controls.Add(_password);
+
+        int nextTop = 22 + _password.Height + 14;
+
         if (_isCreate)
         {
-            layout.Controls.Add(new Label { Text = "Confirmar:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, row);
-            layout.Controls.Add(_confirm, 1, row);
-            row++;
-            layout.Controls.Add(_strength, 1, row);
-            row++;
+            var lblConfirm = MakeLabel("Confirmar senha");
+            lblConfirm.Location = new Point(0, nextTop);
+            body.Controls.Add(lblConfirm);
+
+            _confirm.Width = 372;
+            _confirm.Location = new Point(0, nextTop + 22);
+            body.Controls.Add(_confirm);
+
+            _strength.Location = new Point(2, nextTop + 22 + _confirm.Height + 6);
+            body.Controls.Add(_strength);
 
             var warn = new Label
             {
-                Text = "Esta senha NAO pode ser recuperada. Se esquecer, o cofre fica inacessivel.",
-                AutoSize = true,
-                MaximumSize = new Size(380, 0),
-                ForeColor = Color.Firebrick,
+                Text = "⚠  Esta senha NÃO pode ser recuperada. Se esquecê-la, o cofre fica inacessível.",
+                AutoSize = false,
+                Width = 372,
+                Height = 36,
+                Location = new Point(0, nextTop + 22 + _confirm.Height + 26),
+                ForeColor = Theme.Danger,
+                Font = Theme.Small,
             };
-            layout.SetColumnSpan(warn, 2);
-            layout.Controls.Add(warn, 0, row);
-            row++;
+            body.Controls.Add(warn);
 
             _password.TextChanged += (_, _) => UpdateStrength();
+            nextTop = warn.Bottom + 12;
         }
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill };
-        buttons.Controls.Add(_cancel);
-        buttons.Controls.Add(_ok);
-        layout.SetColumnSpan(buttons, 2);
-        layout.Controls.Add(buttons, 0, row);
+        var ok = new AccentButton(_isCreate ? "Criar cofre" : "Destravar", ButtonKind.Primary) { Width = 150 };
+        var cancel = new AccentButton("Cancelar", ButtonKind.Secondary) { Width = 110, DialogResult = DialogResult.Cancel };
+        ok.Click += OnOk;
 
-        Controls.Add(layout);
+        var buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Dock = DockStyle.Bottom,
+            Height = 60,
+            Padding = new Padding(24, 11, 24, 0),
+            BackColor = Theme.Surface,
+        };
+        buttons.Controls.Add(ok);
+        buttons.Controls.Add(cancel);
+        Controls.Add(buttons);
+        buttons.BringToFront();
 
-        _ok.Click += OnOk;
+        AcceptButton = ok;
+        CancelButton = cancel;
     }
+
+    private static Label MakeLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Font = Theme.Bold,
+        ForeColor = Theme.Text,
+        Location = new Point(2, 0),
+    };
 
     private void UpdateStrength()
     {
-        var p = _password.Text;
-        var (text, color) = ScorePassword(p);
-        _strength.Text = $"Forca: {text}";
+        var (text, color) = ScorePassword(_password.Text);
+        _strength.Text = $"Força: {text}";
         _strength.ForeColor = color;
     }
 
     private static (string, Color) ScorePassword(string p)
     {
-        if (p.Length == 0) return ("—", Color.Gray);
+        if (p.Length == 0) return ("—", Theme.TextMuted);
         int score = 0;
         if (p.Length >= 8) score++;
         if (p.Length >= 12) score++;
@@ -91,41 +124,30 @@ public sealed class UnlockForm : Form
         if (p.Any(c => !char.IsLetterOrDigit(c))) score++;
         return score switch
         {
-            <= 2 => ("fraca", Color.Firebrick),
-            <= 4 => ("media", Color.DarkOrange),
-            _ => ("forte", Color.SeaGreen),
+            <= 2 => ("fraca", Theme.Danger),
+            <= 4 => ("média", Color.DarkOrange),
+            _ => ("forte", Theme.Success),
         };
     }
 
     private void OnOk(object? sender, EventArgs e)
     {
         var pw = _password.Text;
-        if (string.IsNullOrEmpty(pw))
-        {
-            Fail("Informe a senha mestra.");
-            return;
-        }
+        if (string.IsNullOrEmpty(pw)) { Fail("Informe a senha mestra."); return; }
 
         try
         {
             if (_isCreate)
             {
-                if (pw.Length < 8)
-                {
-                    Fail("Use ao menos 8 caracteres na senha mestra.");
-                    return;
-                }
-                if (pw != _confirm.Text)
-                {
-                    Fail("As senhas nao conferem.");
-                    return;
-                }
+                if (pw.Length < 8) { Fail("Use ao menos 8 caracteres na senha mestra."); return; }
+                if (pw != _confirm.Text) { Fail("As senhas não conferem."); return; }
                 _store.Create(pw);
             }
             else
             {
                 _store.Unlock(pw);
             }
+            DialogResult = DialogResult.OK;
         }
         catch (CryptographicException)
         {
@@ -141,7 +163,6 @@ public sealed class UnlockForm : Form
     {
         DialogResult = DialogResult.None;
         MessageBox.Show(this, msg, "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        _password.SelectAll();
-        _password.Focus();
+        _password.SelectAllAndFocus();
     }
 }

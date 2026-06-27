@@ -8,13 +8,13 @@ public sealed class EntryForm : Form
 {
     public VaultEntry Entry { get; }
 
-    private readonly TextBox _title = new() { Width = 320 };
-    private readonly TextBox _username = new() { Width = 320 };
-    private readonly TextBox _password = new() { Width = 250, UseSystemPasswordChar = true };
-    private readonly TextBox _url = new() { Width = 320 };
-    private readonly TextBox _notes = new() { Width = 320, Multiline = true, Height = 70, ScrollBars = ScrollBars.Vertical };
-    private readonly CheckBox _show = new() { Text = "Mostrar", AutoSize = true };
-    private readonly Button _gen = new() { Text = "Gerar", Width = 64 };
+    private readonly UiTextBox _title = new();
+    private readonly UiTextBox _username = new();
+    private readonly UiTextBox _password = new(password: true);
+    private readonly UiTextBox _url = new();
+    private readonly UiTextBox _notes = new(multiline: true);
+    private readonly AccentButton _show = new("Mostrar", ButtonKind.Ghost) { Width = 84, Height = 38 };
+    private readonly AccentButton _gen = new("Gerar", ButtonKind.Secondary) { Width = 84, Height = 38 };
 
     public EntryForm(VaultEntry? existing)
     {
@@ -26,9 +26,12 @@ public sealed class EntryForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Padding = new Padding(16);
+        ClientSize = new Size(460, 470);
+        Theme.ApplyForm(this);
+
+        Controls.Add(Theme.Header(
+            existing is null ? "Nova credencial" : "Editar credencial",
+            "Os dados são salvos criptografados no cofre"));
 
         _title.Text = Entry.Title;
         _username.Text = Entry.Username;
@@ -36,40 +39,72 @@ public sealed class EntryForm : Form
         _url.Text = Entry.Url;
         _notes.Text = Entry.Notes;
 
-        _show.CheckedChanged += (_, _) => _password.UseSystemPasswordChar = !_show.Checked;
-        _gen.Click += (_, _) => { _password.Text = PasswordGenerator.Generate(); };
+        _show.Click += (_, _) =>
+        {
+            _password.UseSystemPasswordChar = !_password.UseSystemPasswordChar;
+            _show.Text = _password.UseSystemPasswordChar ? "Mostrar" : "Ocultar";
+        };
+        _gen.Click += (_, _) => { _password.UseSystemPasswordChar = false; _show.Text = "Ocultar"; _password.Text = PasswordGenerator.Generate(); };
 
-        var pwPanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty };
-        pwPanel.Controls.Add(_password);
-        pwPanel.Controls.Add(_gen);
-        pwPanel.Controls.Add(_show);
+        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 0), BackColor = Theme.Surface };
+        Controls.Add(body);
+        body.BringToFront();
 
-        var layout = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
-        AddRow(layout, "Titulo:", _title, 0);
-        AddRow(layout, "Usuario:", _username, 1);
-        AddRow(layout, "Senha:", pwPanel, 2);
-        AddRow(layout, "URL:", _url, 3);
-        AddRow(layout, "Notas:", _notes, 4);
+        int y = 0;
+        y = AddField(body, "Título", _title, y);
+        y = AddField(body, "Usuário", _username, y);
 
-        var ok = new Button { Text = "Salvar", DialogResult = DialogResult.OK, Width = 100 };
-        var cancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Width = 100 };
+        // Linha da senha: campo + Gerar + Mostrar
+        body.Controls.Add(MakeLabel("Senha", y));
+        _password.Width = 412 - 2 * 88;
+        _password.Location = new Point(0, y + 22);
+        body.Controls.Add(_password);
+        _gen.Location = new Point(_password.Right + 8, y + 22);
+        _show.Location = new Point(_gen.Right + 4, y + 22);
+        body.Controls.Add(_gen);
+        body.Controls.Add(_show);
+        y = y + 22 + _password.Height + 14;
+
+        y = AddField(body, "URL", _url, y);
+        y = AddField(body, "Notas", _notes, y);
+
+        var ok = new AccentButton("Salvar", ButtonKind.Primary) { Width = 130 };
+        var cancel = new AccentButton("Cancelar", ButtonKind.Secondary) { Width = 110, DialogResult = DialogResult.Cancel };
         ok.Click += OnSave;
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill };
-        buttons.Controls.Add(cancel);
+        var buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Dock = DockStyle.Bottom,
+            Height = 62,
+            Padding = new Padding(24, 12, 24, 0),
+            BackColor = Theme.Surface,
+        };
         buttons.Controls.Add(ok);
-        layout.SetColumnSpan(buttons, 2);
-        layout.Controls.Add(buttons, 0, 5);
+        buttons.Controls.Add(cancel);
+        Controls.Add(buttons);
+        buttons.BringToFront();
 
-        Controls.Add(layout);
         AcceptButton = ok;
         CancelButton = cancel;
     }
 
-    private static void AddRow(TableLayoutPanel layout, string label, Control control, int row)
+    private static Label MakeLabel(string text, int y) => new()
     {
-        layout.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 8, 3, 3) }, 0, row);
-        layout.Controls.Add(control, 1, row);
+        Text = text,
+        AutoSize = true,
+        Font = Theme.Bold,
+        ForeColor = Theme.Text,
+        Location = new Point(2, y),
+    };
+
+    private static int AddField(Panel body, string label, UiTextBox field, int y)
+    {
+        body.Controls.Add(MakeLabel(label, y));
+        field.Width = 412;
+        field.Location = new Point(0, y + 22);
+        body.Controls.Add(field);
+        return y + 22 + field.Height + 14;
     }
 
     private void OnSave(object? sender, EventArgs e)
@@ -77,7 +112,7 @@ public sealed class EntryForm : Form
         if (string.IsNullOrWhiteSpace(_title.Text))
         {
             DialogResult = DialogResult.None;
-            MessageBox.Show(this, "Informe um titulo.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Informe um título.", "Secret Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         Entry.Title = _title.Text.Trim();
@@ -86,5 +121,6 @@ public sealed class EntryForm : Form
         Entry.Url = _url.Text.Trim();
         Entry.Notes = _notes.Text;
         Entry.UpdatedAt = DateTimeOffset.UtcNow;
+        DialogResult = DialogResult.OK;
     }
 }

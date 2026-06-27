@@ -9,18 +9,23 @@ public sealed class MainForm : Form
     private readonly VaultStore _store;
     private readonly AppSettings _settings;
 
-    private readonly TextBox _search = new() { Width = 240, PlaceholderText = "Buscar..." };
+    private readonly UiTextBox _search = new() { Width = 240 };
     private readonly ListView _list = new()
     {
         View = View.Details,
         FullRowSelect = true,
         MultiSelect = false,
         Dock = DockStyle.Fill,
-        HideSelection = false,
+        HeaderStyle = ColumnHeaderStyle.Nonclickable,
+        BorderStyle = BorderStyle.None,
+        OwnerDraw = true,
+        BackColor = Theme.Surface,
     };
 
+    private int _hoverIndex = -1;
     private System.Windows.Forms.Timer? _clipboardTimer;
     private string? _clipboardGuard;
+    private readonly ToolStripStatusLabel _statusLabel = new("Pronto.");
 
     /// <summary>Disparado quando o usuario pede para travar o cofre pela janela.</summary>
     public event EventHandler? LockRequested;
@@ -32,10 +37,10 @@ public sealed class MainForm : Form
 
         Text = "Secret Manager";
         StartPosition = FormStartPosition.CenterScreen;
-        Width = 720;
-        Height = 460;
-        MinimumSize = new Size(560, 360);
+        ClientSize = new Size(760, 520);
+        MinimumSize = new Size(620, 420);
         ShowInTaskbar = true;
+        Theme.ApplyForm(this);
 
         BuildUi();
         ReloadList();
@@ -43,50 +48,119 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
-        var toolbar = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
-        toolbar.Items.Add(NewButton("Nova", (_, _) => AddEntry()));
-        toolbar.Items.Add(NewButton("Editar", (_, _) => EditSelected()));
-        toolbar.Items.Add(NewButton("Excluir", (_, _) => DeleteSelected()));
-        toolbar.Items.Add(new ToolStripSeparator());
-        toolbar.Items.Add(NewButton("Copiar usuario", (_, _) => CopySelected(pw: false)));
-        toolbar.Items.Add(NewButton("Copiar senha", (_, _) => CopySelected(pw: true)));
-        toolbar.Items.Add(new ToolStripSeparator());
-        toolbar.Items.Add(NewButton("Backup pendrive", (_, _) => DoBackup()));
-        toolbar.Items.Add(NewButton("Config", (_, _) => OpenSettings()));
-        toolbar.Items.Add(NewButton("Travar", (_, _) => LockRequested?.Invoke(this, EventArgs.Empty)));
-
-        var searchPanel = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
-        var host = new ToolStripControlHost(_search);
-        searchPanel.Items.Add(new ToolStripLabel("Filtro: "));
-        searchPanel.Items.Add(host);
-        _search.TextChanged += (_, _) => ReloadList();
-
-        _list.Columns.Add("Titulo", 200);
-        _list.Columns.Add("Usuario", 180);
+        // --- Lista (preenche o centro) ---
+        _list.Columns.Add("Título", 220);
+        _list.Columns.Add("Usuário", 190);
         _list.Columns.Add("URL", 220);
         _list.Columns.Add("Atualizado", 90);
+        _list.Font = new Font("Segoe UI", 9.75f);
         _list.DoubleClick += (_, _) => CopySelected(pw: true);
         _list.KeyDown += OnListKeyDown;
+        _list.DrawColumnHeader += OnDrawHeader;
+        _list.DrawItem += (_, e) => e.DrawDefault = false;
+        _list.DrawSubItem += OnDrawSubItem;
+        _list.MouseMove += OnListMouseMove;
+        _list.MouseLeave += (_, _) => { _hoverIndex = -1; _list.Invalidate(); };
 
-        var top = new ToolStripContainer { Dock = DockStyle.Fill };
-        top.TopToolStripPanel.Controls.Add(searchPanel);
-        top.TopToolStripPanel.Controls.Add(toolbar);
-        top.ContentPanel.Controls.Add(_list);
+        var listHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 8, 16, 8), BackColor = Theme.AppBackground };
+        var card = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Padding = new Padding(1) };
+        card.Controls.Add(_list);
+        listHost.Controls.Add(card);
 
-        var status = new StatusStrip();
-        status.Items.Add(new ToolStripStatusLabel(
-            "Enter/duplo-clique copia a senha. A area de transferencia e limpada automaticamente."));
+        // --- Barra de acoes ---
+        var toolbar = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Theme.AppBackground, Padding = new Padding(16, 11, 16, 0) };
 
-        Controls.Add(top);
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent };
+        actions.Controls.Add(MakeButton("+ Nova", ButtonKind.Primary, () => AddEntry(), 96));
+        actions.Controls.Add(MakeButton("Editar", ButtonKind.Secondary, () => EditSelected(), 84));
+        actions.Controls.Add(MakeButton("Excluir", ButtonKind.Secondary, () => DeleteSelected(), 84));
+        actions.Controls.Add(MakeButton("Copiar senha", ButtonKind.Secondary, () => CopySelected(true), 120));
+        actions.Controls.Add(MakeButton("Copiar usuário", ButtonKind.Secondary, () => CopySelected(false), 126));
+
+        var rightActions = new FlowLayoutPanel { Dock = DockStyle.Right, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent, AutoSize = true };
+        rightActions.Controls.Add(MakeButton("Backup", ButtonKind.Ghost, () => DoBackup(), 84));
+        rightActions.Controls.Add(MakeButton("Config", ButtonKind.Ghost, () => OpenSettings(), 78));
+        rightActions.Controls.Add(MakeButton("🔒 Travar", ButtonKind.Ghost, () => LockRequested?.Invoke(this, EventArgs.Empty), 92));
+
+        toolbar.Controls.Add(actions);
+        toolbar.Controls.Add(rightActions);
+
+        // --- Header com busca embutida ---
+        var header = Theme.Header("Secret Manager", "Suas senhas, criptografadas e à mão", height: 76);
+        _search.PlaceholderText = "🔎  Buscar...";
+        _search.Width = 230;
+        _search.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        _search.Location = new Point(header.Width - 230 - 20, 19);
+        _search.TextChanged += (_, _) => ReloadList();
+        header.Controls.Add(_search);
+        header.Resize += (_, _) => _search.Location = new Point(header.Width - _search.Width - 20, 19);
+
+        // --- Status ---
+        var status = new StatusStrip { BackColor = Theme.Surface, SizingGrip = false };
+        _statusLabel.ForeColor = Theme.TextMuted;
+        status.Items.Add(_statusLabel);
+
+        // Ordem de docking (ultimo Fill por cima dos Top/Bottom)
+        Controls.Add(listHost);
+        Controls.Add(toolbar);
         Controls.Add(status);
+        Controls.Add(header);
     }
 
-    private static ToolStripButton NewButton(string text, EventHandler onClick)
+    private AccentButton MakeButton(string text, ButtonKind kind, Action onClick, int width)
     {
-        var b = new ToolStripButton(text) { DisplayStyle = ToolStripItemDisplayStyle.Text };
-        b.Click += onClick;
+        var b = new AccentButton(text, kind) { Width = width, Height = 38, Margin = new Padding(0, 0, 8, 0) };
+        b.Click += (_, _) => onClick();
         return b;
     }
+
+    // ---------- Owner draw ----------
+
+    private void OnDrawHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+    {
+        using var bg = new SolidBrush(Theme.Surface);
+        e.Graphics.FillRectangle(bg, e.Bounds);
+        var rect = e.Bounds; rect.X += 8;
+        TextRenderer.DrawText(e.Graphics, e.Header?.Text, new Font("Segoe UI Semibold", 8.5f), rect,
+            Theme.TextMuted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+        using var pen = new Pen(Theme.Border);
+        e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+    }
+
+    private void OnDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+    {
+        bool selected = e.Item!.Selected;
+        bool hover = e.ItemIndex == _hoverIndex;
+
+        if (e.ColumnIndex == 0)
+        {
+            var rowRect = new Rectangle(0, e.Bounds.Y, _list.ClientSize.Width, e.Bounds.Height);
+            Color back = selected ? Theme.RowSelected : hover ? Theme.RowHover : (e.ItemIndex % 2 == 1 ? Theme.RowAlt : Theme.Surface);
+            using var b = new SolidBrush(back);
+            e.Graphics.FillRectangle(b, rowRect);
+            if (selected)
+            {
+                using var accent = new SolidBrush(Theme.Accent);
+                e.Graphics.FillRectangle(accent, new Rectangle(0, e.Bounds.Y, 3, e.Bounds.Height));
+            }
+        }
+
+        var textRect = e.Bounds; textRect.X += 8; textRect.Width -= 12;
+        var font = e.ColumnIndex == 0 ? new Font("Segoe UI Semibold", 9.75f) : new Font("Segoe UI", 9.5f);
+        var color = e.ColumnIndex == 0 ? Theme.Text : Theme.TextMuted;
+        TextRenderer.DrawText(e.Graphics, e.SubItem?.Text, font, textRect, color,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        font.Dispose();
+    }
+
+    private void OnListMouseMove(object? sender, MouseEventArgs e)
+    {
+        var item = _list.GetItemAt(e.X, e.Y);
+        int idx = item?.Index ?? -1;
+        if (idx != _hoverIndex) { _hoverIndex = idx; _list.Invalidate(); }
+    }
+
+    // ---------- Dados ----------
 
     private void OnListKeyDown(object? sender, KeyEventArgs e)
     {
@@ -108,6 +182,8 @@ public sealed class MainForm : Form
             _list.Items.Add(item);
         }
         _list.EndUpdate();
+        var n = _list.Items.Count;
+        _statusLabel.Text = n == 0 ? "Nenhuma credencial. Clique em “+ Nova”." : $"{n} credencial(is).";
     }
 
     private VaultEntry? Selected =>
@@ -126,7 +202,7 @@ public sealed class MainForm : Form
     private void EditSelected()
     {
         var sel = Selected;
-        if (sel is null) return;
+        if (sel is null) { Toast("Selecione uma credencial."); return; }
         using var form = new EntryForm(sel);
         if (form.ShowDialog(this) == DialogResult.OK)
             PersistAndRefresh();
@@ -135,7 +211,7 @@ public sealed class MainForm : Form
     private void DeleteSelected()
     {
         var sel = Selected;
-        if (sel is null) return;
+        if (sel is null) { Toast("Selecione uma credencial."); return; }
         if (MessageBox.Show(this, $"Excluir \"{sel.Title}\"?", "Secret Manager",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
         {
@@ -166,17 +242,24 @@ public sealed class MainForm : Form
     private void CopySelected(bool pw)
     {
         var sel = Selected;
-        if (sel is null) return;
+        if (sel is null) { Toast("Selecione uma credencial."); return; }
         var value = pw ? sel.Password : sel.Username;
         if (string.IsNullOrEmpty(value)) return;
 
         try
         {
             Clipboard.SetText(value);
-            if (pw) ScheduleClipboardClear(value);
+            if (pw)
+            {
+                ScheduleClipboardClear(value);
+                Toast($"Senha copiada — limpa em {Math.Max(5, _settings.ClipboardClearSeconds)}s.");
+            }
+            else Toast("Usuário copiado.");
         }
         catch { /* clipboard ocupado por outro processo */ }
     }
+
+    private void Toast(string msg) => _statusLabel.Text = msg;
 
     private void ScheduleClipboardClear(string value)
     {
@@ -192,7 +275,6 @@ public sealed class MainForm : Form
             _clipboardTimer!.Stop();
             try
             {
-                // So limpa se ainda for o nosso valor (nao apaga o que o usuario copiou depois).
                 if (Clipboard.ContainsText() && Clipboard.GetText() == _clipboardGuard)
                     Clipboard.Clear();
             }
@@ -216,7 +298,6 @@ public sealed class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        // Fechar a janela apenas a esconde; o app continua no tray.
         if (e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
