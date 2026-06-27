@@ -13,10 +13,16 @@ public sealed class EntryForm : Form
     private readonly UiTextBox _password = new(password: true);
     private readonly UiTextBox _url = new();
     private readonly UiTextBox _notes = new(multiline: true);
+    private readonly ComboBox _group = new()
+    {
+        DropDownStyle = ComboBoxStyle.DropDown,
+        FlatStyle = FlatStyle.Flat,
+        Font = new Font("Segoe UI", 10f),
+    };
     private readonly AccentButton _show = new("Mostrar", ButtonKind.Ghost) { Width = 84, Height = 38 };
     private readonly AccentButton _gen = new("Gerar", ButtonKind.Secondary) { Width = 84, Height = 38 };
 
-    public EntryForm(VaultEntry? existing)
+    public EntryForm(VaultEntry? existing, IEnumerable<string>? existingGroups = null)
     {
         Entry = existing ?? new VaultEntry();
 
@@ -26,8 +32,12 @@ public sealed class EntryForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(460, 540);
+        ClientSize = new Size(460, 600);
         Theme.ApplyForm(this);
+
+        if (existingGroups is not null)
+            _group.Items.AddRange(existingGroups.Cast<object>().ToArray());
+        _group.Text = Entry.Group;
 
         var header = Theme.Header(
             existing is null ? "Nova credencial" : "Editar credencial",
@@ -64,6 +74,14 @@ public sealed class EntryForm : Form
         y = y + 22 + _password.Height + 14;
 
         y = AddField(body, "URL", _url, y);
+
+        // Grupo (opcional): combo editavel com os grupos ja existentes.
+        body.Controls.Add(MakeLabel("Grupo (opcional)", y));
+        _group.Width = 412;
+        _group.Location = new Point(0, y + 22);
+        body.Controls.Add(_group);
+        y = y + 22 + _group.Height + 14;
+
         y = AddField(body, "Notas", _notes, y);
 
         var ok = new AccentButton("Salvar", ButtonKind.Primary) { Width = 130 };
@@ -119,6 +137,7 @@ public sealed class EntryForm : Form
         Entry.Username = _username.Text;
         Entry.Password = _password.Text;
         Entry.Url = _url.Text.Trim();
+        Entry.Group = _group.Text.Trim();
         Entry.Notes = _notes.Text;
         Entry.UpdatedAt = DateTimeOffset.UtcNow;
         DialogResult = DialogResult.OK;

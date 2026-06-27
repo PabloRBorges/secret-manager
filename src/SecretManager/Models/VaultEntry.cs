@@ -12,6 +12,10 @@ public sealed class VaultEntry
     public string Password { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
+
+    /// <summary>Grupo/categoria. Opcional — vazio significa "sem grupo".</summary>
+    public string Group { get; set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -21,6 +25,7 @@ public sealed class VaultEntry
         return Title.Contains(term, StringComparison.OrdinalIgnoreCase)
             || Username.Contains(term, StringComparison.OrdinalIgnoreCase)
             || Url.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || Group.Contains(term, StringComparison.OrdinalIgnoreCase)
             || Notes.Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 }

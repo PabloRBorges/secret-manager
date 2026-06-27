@@ -21,6 +21,7 @@ Gerenciador de senhas leve, nativo do Windows, que roda no **system tray** (ao l
 - ⏱️ **Auto-lock** por inatividade (configurável; detecta ociosidade via `GetLastInputInfo`)
 - 📋 Cópia de senha para clipboard com **limpeza automática** após N segundos
 - 🎲 Gerador de senhas fortes (RNG criptográfico, sem caracteres ambíguos)
+- 🗂️ **Grupos/categorias** opcionais — a lista agrupa por grupo (credenciais sem grupo vão para "Sem grupo"), com filtro por grupo no topo
 - 💾 **Backup criptografado para pendrive** (manual ou automático a cada alteração)
 - 🔑 Troca de senha mestra (re-criptografa todo o cofre)
 - 🪶 Leve: WinForms nativo, sem Electron; publicável como **único .exe**

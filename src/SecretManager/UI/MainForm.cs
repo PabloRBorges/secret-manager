@@ -9,7 +9,17 @@ public sealed class MainForm : Form
     private readonly VaultStore _store;
     private readonly AppSettings _settings;
 
+    private const string AllGroupsLabel = "Todos os grupos";
+
     private readonly UiTextBox _search = new() { Width = 240 };
+    private readonly ComboBox _groupFilter = new()
+    {
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        FlatStyle = FlatStyle.Flat,
+        Font = new Font("Segoe UI", 9.5f),
+        Width = 180,
+    };
+    private bool _suppressFilter;
     private readonly ListView _list = new()
     {
         View = View.Details,
@@ -93,7 +103,19 @@ public sealed class MainForm : Form
         _search.Location = new Point(header.Width - 230 - 20, 19);
         _search.TextChanged += (_, _) => ReloadList();
         header.Controls.Add(_search);
-        header.Resize += (_, _) => _search.Location = new Point(header.Width - _search.Width - 20, 19);
+
+        // Filtro por grupo, a esquerda da busca.
+        _groupFilter.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        _groupFilter.SelectedIndexChanged += (_, _) => { if (!_suppressFilter) ReloadList(); };
+        header.Controls.Add(_groupFilter);
+
+        void PositionHeaderControls()
+        {
+            _search.Location = new Point(header.Width - _search.Width - 20, 19);
+            _groupFilter.Location = new Point(_search.Left - _groupFilter.Width - 10, 21);
+        }
+        PositionHeaderControls();
+        header.Resize += (_, _) => PositionHeaderControls();
 
         // --- Status ---
         var status = new StatusStrip { BackColor = Theme.Surface, SizingGrip = false };
@@ -171,27 +193,79 @@ public sealed class MainForm : Form
     private void ReloadList()
     {
         if (_store.Current is null) return;
+
+        RefreshGroupFilter();
+        var filter = SelectedFilterGroup(); // null = todos
+
+        var entries = _store.Current.Search(_search.Text)
+            .Where(e => filter is null || string.Equals(Vault.DisplayGroup(e.Group), filter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         _list.BeginUpdate();
         _list.Items.Clear();
-        foreach (var entry in _store.Current.Search(_search.Text))
+        _list.Groups.Clear();
+
+        // Cria os grupos em ordem: reais (alfabetica) e "Sem grupo" por ultimo.
+        var displays = entries.Select(e => Vault.DisplayGroup(e.Group))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(d => d == Vault.NoGroupLabel ? 1 : 0)
+            .ThenBy(d => d, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var groupMap = new Dictionary<string, ListViewGroup>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in displays)
+        {
+            var g = new ListViewGroup(d) { HeaderAlignment = HorizontalAlignment.Left };
+            groupMap[d] = g;
+            _list.Groups.Add(g);
+        }
+
+        foreach (var entry in entries)
         {
             var item = new ListViewItem(entry.Title) { Tag = entry };
             item.SubItems.Add(entry.Username);
             item.SubItems.Add(entry.Url);
             item.SubItems.Add(entry.UpdatedAt.LocalDateTime.ToString("dd/MM/yy"));
+            item.Group = groupMap[Vault.DisplayGroup(entry.Group)];
             _list.Items.Add(item);
         }
+
+        _list.ShowGroups = _list.Groups.Count > 0;
         _list.EndUpdate();
+
         var n = _list.Items.Count;
         _statusLabel.Text = n == 0 ? "Nenhuma credencial. Clique em “+ Nova”." : $"{n} credencial(is).";
     }
+
+    /// <summary>Repopula o filtro de grupos preservando a selecao atual.</summary>
+    private void RefreshGroupFilter()
+    {
+        var desired = new List<string> { AllGroupsLabel };
+        desired.AddRange(_store.Current!.Groups());
+        if (_store.Current.Entries.Any(e => string.IsNullOrWhiteSpace(e.Group)))
+            desired.Add(Vault.NoGroupLabel);
+
+        var current = _groupFilter.Items.Cast<string>().ToList();
+        if (current.SequenceEqual(desired)) return;
+
+        var prev = _groupFilter.SelectedItem as string;
+        _suppressFilter = true;
+        _groupFilter.Items.Clear();
+        _groupFilter.Items.AddRange(desired.Cast<object>().ToArray());
+        var idx = prev is not null ? desired.IndexOf(prev) : 0;
+        _groupFilter.SelectedIndex = idx >= 0 ? idx : 0;
+        _suppressFilter = false;
+    }
+
+    private string? SelectedFilterGroup() =>
+        _groupFilter.SelectedItem is string s && s != AllGroupsLabel ? s : null;
 
     private VaultEntry? Selected =>
         _list.SelectedItems.Count > 0 ? _list.SelectedItems[0].Tag as VaultEntry : null;
 
     private void AddEntry()
     {
-        using var form = new EntryForm(null);
+        using var form = new EntryForm(null, _store.Current!.Groups());
         if (form.ShowDialog(this) == DialogResult.OK)
         {
             _store.Current!.Entries.Add(form.Entry);
@@ -203,7 +277,7 @@ public sealed class MainForm : Form
     {
         var sel = Selected;
         if (sel is null) { Toast("Selecione uma credencial."); return; }
-        using var form = new EntryForm(sel);
+        using var form = new EntryForm(sel, _store.Current!.Groups());
         if (form.ShowDialog(this) == DialogResult.OK)
             PersistAndRefresh();
     }
